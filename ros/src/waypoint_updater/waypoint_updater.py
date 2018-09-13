@@ -2,7 +2,7 @@
 
 import rospy
 from geometry_msgs.msg import PoseStamped
-from styx_msgs.msg import Lane, Waypoint
+from styx_msgs.msg import Lane, Waypoint, TrafficLightArray
 from scipy.spatial import KDTree
 import numpy as np
 
@@ -24,6 +24,7 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
+MAX_DECEL = 9.81 * 1.5 # max deceleration 1.5 g
 
 
 class WaypointUpdater(object):
@@ -49,6 +50,7 @@ class WaypointUpdater(object):
         self.pose = None
 
         self.stopline_wp_idx = None
+        self.stopline_dist = 100000
 
         self.loop()
 
@@ -93,27 +95,36 @@ class WaypointUpdater(object):
         closest_idx = self.get_closest_waypoint_idx()
         farthest_idx = closest_idx + LOOKAHEAD_WPS
         # replaced base_lane with base_waypoints
-        base_waypoints = self.base_waypoints.waypoints[closest_idx:farhtest_idx]
+        base_waypoints = self.base_waypoints.waypoints[closest_idx:farthest_idx]
+        distance_to_stopline = 10000
 
-        if self.stopline_wp_idx == -1 or (self.stopline_wp_idx >= farhtest_idx):
+        if self.stopline_wp_idx == None or (self.stopline_wp_idx >= farthest_idx) or self.stopline_dist >= 35:
             lane.waypoints = base_waypoints
         else:
+            #rospy.loginfo("Will stop for traffic light!!!")
+            #rospy.loginfo("stopline idx %d farthest_idx %d distance %.2f", self.stopline_wp_idx, farthest_idx, self.stopline_dist)
             lane.waypoints = self.decelerate_waypoints(base_waypoints, closest_idx)
         return lane
 
     def decelerate_waypoints(self, waypoints, closest_idx):
         '''make the car slow down in front of a red traffic light or other obstacle'''
         temp = []
+        # catch race condition in case light suddenly turns green and there is no
+        # stopline anymore
+        stopline = self.stopline_wp_idx
+        if stopline == None:
+            return waypoints
         for i, wp in enumerate(waypoints):
             p = Waypoint()
             p.pose = wp.pose
             # two waypoints back from the line so that center of car doesn't go over line
-            stop_idx = max(self.stopline_wp_idx - closest_idx - 2, 0)
+            stop_idx = max(stopline - closest_idx - 3, 0)
             dist = self.distance(waypoints, i, stop_idx)
-            #vel = math.sqrt(2 * MAX_DECEL * dist)
+            vel = math.sqrt(2 * MAX_DECEL * dist)
             #try shifted sigmoid function to slow down smoothly as a s-curve
-            vel = (math.tanh(dist / 8.0 - 2.) + 1.0) / 2.0 * MAX_DECEL
-            if vel < 1.0:
+            #vel = (math.tanh(dist / 8.0 - 2.) + 1.0)  * MAX_DECEL
+            #rospy.loginfo("Setting new velocity %.2f", vel)
+            if vel < 1.25:
                 vel = 0
             p.twist.twist.linear.x = min(vel, wp.twist.twist.linear.x)
             temp.append(p)
@@ -133,8 +144,57 @@ class WaypointUpdater(object):
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
-        # TODO: add code here
-        pass
+        # SIM ONLY !!!!!!
+        light_info = msg.lights
+        active_lights = []
+        for light in light_info:
+            pose = light.pose
+            state = light.state
+            #rospy.loginfo("Traffic Light at pos %.2f %.2f state: %d", pose.pose.position.x, pose.pose.position.y, state)
+            # if yello or red --> mark for slowdown
+            if state < 2:
+                active_lights.append(light)
+
+
+        if len(active_lights):
+            #rospy.loginfo("Found %d red/yellow traffic lights", len(active_lights))
+            # find closest active light, and save its index
+            closest_light = []
+            closest_dist = 100000
+
+            for l in active_lights:
+                # car x/y
+                cx = self.pose.pose.position.x
+                cy = self.pose.pose.position.y
+                # light x/y
+                lx = l.pose.pose.position.x
+                ly = l.pose.pose.position.y
+                # euclidean distance
+                dist = math.sqrt((cx-lx)**2 + (cy-ly)**2)
+                if dist < closest_dist:
+                    closest_light = l
+                    closest_dist = dist
+
+            # now find the index of the traffic light on our path using the KDTree
+            # and set it as self.stopline_wp_idx
+            lx = closest_light.pose.pose.position.x
+            ly = closest_light.pose.pose.position.y
+
+
+            closest_light_idx = self.waypoint_tree.query([lx,ly],1)[1]
+            #print cx,cy, closest_light_idx, lx, ly, closest_me_idx, len(self.waypoints_2d)
+            #rospy.loginfo("Closest red or yellow traffic light at %.2f %.2f at %.2f m", lx, ly, closest_dist)
+            self.stopline_wp_idx = closest_light_idx
+            self.stopline_dist = closest_dist
+        else:
+            # no active traffic lights --> reset self.stopline_wp_idx to None
+            self.stopline_wp_idx = None
+            self.stopline_dist = 10000
+
+
+
+
+
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
