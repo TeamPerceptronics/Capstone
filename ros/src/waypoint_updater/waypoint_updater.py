@@ -48,6 +48,7 @@ class WaypointUpdater(object):
         self.loop()
 
     def loop(self):
+        # could be as low as 30Hz
 	rate = rospy.Rate(50)
 	while not rospy.is_shutdown():
 	    if self.pose and self.base_waypoints:
@@ -86,13 +87,15 @@ class WaypointUpdater(object):
     def pose_cb(self, msg):
         # TODO: Implement
 	self.pose = msg
-        pass
+        #pass
 
     def waypoints_cb(self, waypoints):	
         # TODO: Implement
 	self.base_waypoints = waypoints
+        # prevent race condition by ensuring waypoints_2d is initialize
 	if not self.waypoints_2d:
 	    self.waypoints_2d =  [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y] for waypoint in waypoints.waypoints]
+            # scipy - a way to find the closest waypoint efficiently through KDTree
 	    self.waypoint_tree = KDTree(self.waypoints_2d)
 
     def traffic_cb(self, msg):
