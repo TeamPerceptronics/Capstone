@@ -90,7 +90,7 @@ class TLDetector(object):
             self.upcoming_red_light_pub.publish(Int32(self.last_wp))
         self.state_count += 1
 
-    def distance(pose1, pose2):
+    def distance(self, pose1, pose2):
         """ Gets the distance between two pose vectors
         """
         dx = pose1.x - pose2.x
@@ -111,8 +111,9 @@ class TLDetector(object):
         #TODO A simple implementation. May be upgraded
         index = 0
         mindist = 99999
-        for i, wp in enumerate(self.waypoint):
-            dist = self.distance(pose, wp.pose.pose)
+        for i, wp in enumerate(self.waypoints.waypoints):
+            # rospy.loginfo('pose: {0}, wp.pose.pose: {1}'.format(pose.position, wp.pose.pose.position))
+            dist = self.distance(pose.position, wp.pose.pose.position)
             if dist < mindist:
                 mindist = dist
                 index = i
@@ -156,21 +157,25 @@ class TLDetector(object):
             car_position = self.get_closest_waypoint(self.pose.pose)
 
             #TODO find the closest visible traffic light (if one exists)
-            diff = len(self.waypoints)
+            diff = len(self.waypoints.waypoints)
             for i, light in enumerate(self.lights):
                 # Get stop line waypoint index
                 line = stop_line_positions[i]
-                temp_wp_idx = self.get_closest_waypoint(line.pose.pose)
+                line_pose = Pose()
+                line_pose.position.x = line[0]
+                line_pose.position.y = line[1]
+                temp_wp_idx = self.get_closest_waypoint(line_pose)
                 # Find closest stop ine waypoint index
-                d = temp_wp_idx - car_wp_idx
+                d = temp_wp_idx - car_position
                 if d >= 0 and d < diff:
                     diff = d
                     closest_light = light
                     line_wp_idx = temp_wp_idx
 
+        # rospy.loginfo('Closest waypoint {0}'.format(closest_light))
         if closest_light:
             state = self.get_light_state(light)
-            return light_wp, state
+            return -1, TrafficLight.UNKNOWN #light_wp, state
 
         self.waypoints = None
         return -1, TrafficLight.UNKNOWN

@@ -1,8 +1,8 @@
-prefix=/capstone/ros/devel
+prefix=/home/md/Projects/Udacity/Capstone/ros/devel
 
 Name: styx_msgs
 Description: Description of styx_msgs
 Version: 0.0.0
-Cflags: -I/capstone/ros/devel/include
-Libs: -L/capstone/ros/devel/lib 
+Cflags: -I/home/md/Projects/Udacity/Capstone/ros/devel/include
+Libs: -L/home/md/Projects/Udacity/Capstone/ros/devel/lib 
 Requires: 
