@@ -172,7 +172,7 @@ class TLDetector(object):
                     closest_light = light
                     line_wp_idx = temp_wp_idx
 
-        # rospy.loginfo('Closest waypoint {0}'.format(closest_light))
+        # qrospy.loginfo('Closest waypoint {0}'.format(closest_light))
         if closest_light:
             state = self.get_light_state(light)
             return -1, TrafficLight.UNKNOWN #light_wp, state
