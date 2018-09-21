@@ -118,13 +118,13 @@ class WaypointUpdater(object):
             p = Waypoint()
             p.pose = wp.pose
             # two waypoints back from the line so that center of car doesn't go over line
-            stop_idx = max(stopline - closest_idx - 3, 0)
+            stop_idx = max(stopline - closest_idx - 1, 0)
             dist = self.distance(waypoints, i, stop_idx)
             vel = math.sqrt(2 * MAX_DECEL * dist)
             #try shifted sigmoid function to slow down smoothly as a s-curve
             #vel = (math.tanh(dist / 8.0 - 2.) + 1.0)  * MAX_DECEL
             #rospy.loginfo("Setting new velocity %.2f", vel)
-            if vel < 1.25:
+            if vel < 1.75:
                 vel = 0
             p.twist.twist.linear.x = min(vel, wp.twist.twist.linear.x)
             temp.append(p)
@@ -184,7 +184,8 @@ class WaypointUpdater(object):
             closest_light_idx = self.waypoint_tree.query([lx,ly],1)[1]
             #print cx,cy, closest_light_idx, lx, ly, closest_me_idx, len(self.waypoints_2d)
             #rospy.loginfo("Closest red or yellow traffic light at %.2f %.2f at %.2f m", lx, ly, closest_dist)
-            self.stopline_wp_idx = closest_light_idx
+            #NOTE: closest_light - 5 in order to stop before light
+            self.stopline_wp_idx = closest_light_idx - 5
             self.stopline_dist = closest_dist
         else:
             # no active traffic lights --> reset self.stopline_wp_idx to None
