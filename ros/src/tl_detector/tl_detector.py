@@ -10,6 +10,7 @@ from light_classification.tl_classifier import TLClassifier
 import tf
 import cv2
 import yaml
+import math
 
 STATE_COUNT_THRESHOLD = 3
 
@@ -37,6 +38,10 @@ class TLDetector(object):
 
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
+        try:
+            self.save_false = self.config['save_false_detections']
+        except KeyError:
+            self.save_false = False
 
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
@@ -48,6 +53,15 @@ class TLDetector(object):
         self.last_state = TrafficLight.UNKNOWN
         self.last_wp = -1
         self.state_count = 0
+        
+        self.STATE_MAP = {
+            TrafficLight.UNKNOWN: 'unknown',
+            TrafficLight.GREEN: 'green',
+            TrafficLight.RED: 'red',
+            TrafficLight.YELLOW: 'yellow'
+        }
+        
+        self.f_cnt = 0
 
         rospy.spin()
 
@@ -96,7 +110,7 @@ class TLDetector(object):
         dx = pose1.x - pose2.x
         dy = pose1.y - pose2.y
         dz = pose1.z - pose2.z
-        return (dx*dx + dy*dy + dz*dz)
+        return math.sqrt(dx*dx + dy*dy + dz*dz)
 
     def get_closest_waypoint(self, pose):
         """Identifies the closest path waypoint to the given position
@@ -134,9 +148,14 @@ class TLDetector(object):
             return False
 
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+        # cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "rgb8")
 
         #Get classification
-        return self.light_classifier.get_classification(cv_image)
+        state = self.light_classifier.get_classification(cv_image)
+        if self.save_false and state != light.state:
+            cv2.imwrite('incorrect/sim_img_{0}.png'.format(self.f_cnt), cv_image)
+            self.f_cnt += 1
+        return 
 
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
@@ -149,12 +168,14 @@ class TLDetector(object):
         """
         closest_light = None
         line_wp_idx = None
+        max_dist_to_light = 50      # meters
 
         # List of positions that correspond to the line to stop in front of for a given intersection
         stop_line_positions = self.config['stop_line_positions']
         if(self.pose):
             # Get the waypoint closest to our position
             car_position = self.get_closest_waypoint(self.pose.pose)
+            # rospy.loginfo('Closest car waypoint: {0}'.format(car_position))
 
             #TODO find the closest visible traffic light (if one exists)
             diff = len(self.waypoints.waypoints)
@@ -167,18 +188,26 @@ class TLDetector(object):
                 temp_wp_idx = self.get_closest_waypoint(line_pose)
                 # Find closest stop ine waypoint index
                 d = temp_wp_idx - car_position
-                if d >= 0 and d < diff:
+                dist_to_light = self.distance(self.pose.pose.position, line_pose.position)
+                #rospy.loginfo('Distance to light: {0}'.format(dist_to_light))
+                if d >= 0 and d < diff and dist_to_light < max_dist_to_light:
                     diff = d
                     closest_light = light
                     line_wp_idx = temp_wp_idx
 
-        # qrospy.loginfo('Closest waypoint {0}'.format(closest_light))
+        # rospy.loginfo('Closest light waypoint {0}'.format(line_wp_idx))
+        state = TrafficLight.UNKNOWN
         if closest_light:
-            state = self.get_light_state(light)
-            return -1, TrafficLight.UNKNOWN #light_wp, state
+            state = self.get_light_state(closest_light)
+            rospy.loginfo('Expected light state is {0}: {1}'.format(closest_light.state, self.STATE_MAP[closest_light.state]))
+            #return -1, TrafficLight.UNKNOWN #light_wp, state
+        
+        light_wp = -1
+        if line_wp_idx is not None:
+            light_wp = line_wp_idx
 
-        self.waypoints = None
-        return -1, TrafficLight.UNKNOWN
+        #self.waypoints = None
+        return light_wp, state
 
 if __name__ == '__main__':
     try:

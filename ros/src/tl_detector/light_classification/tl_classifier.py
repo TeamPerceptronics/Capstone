@@ -8,7 +8,7 @@ class TLClassifier(object):
         #TODO load classifier
 
         self.graph = tf.Graph()
-        FROZEN_GRAPH = '/home/md/Projects/Udacity/Capstone_downloads/models/train_ssd_sim/fine_tuned/frozen_inference_graph.pb'
+        FROZEN_GRAPH = 'models/frozen_inference_graph.pb'
 
         with self.graph.as_default():
             graph_def = tf.GraphDef()
@@ -25,6 +25,14 @@ class TLClassifier(object):
             self.classes = self.graph.get_tensor_by_name('detection_classes:0')
         
         rospy.loginfo('Classifier model loaded')
+        
+        self.STATE_MAP = {
+            0: 'unknown',
+            1: 'green',
+            2: 'red',
+            3: 'yellow',
+            4: 'off'
+        }
             
         # pass
 
@@ -51,12 +59,12 @@ class TLClassifier(object):
         classes = np.squeeze(classes)
 
         light_state = TrafficLight.UNKNOWN
-        if classes[0] == 1:
+        if scores[0] > 0.9 and classes[0] == 1:
             light_state = TrafficLight.GREEN
-        elif classes[0] == 2:
+        elif scores[0] and classes[0] == 2:
             light_state = TrafficLight.RED
-        elif classes[0] == 3:
+        elif scores[0] and classes[0] == 3:
             light_state = TrafficLight.YELLOW
         
-        rospy.loginfo('Detected light state: {0}'.format(light_state))
+        rospy.loginfo('Detected light state: {0} with score {1}'.format(self.STATE_MAP[classes[0]], scores[0]))
         return light_state
