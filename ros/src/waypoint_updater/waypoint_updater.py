@@ -4,6 +4,7 @@ import rospy
 from geometry_msgs.msg import PoseStamped
 from styx_msgs.msg import Lane, Waypoint, TrafficLightArray
 from scipy.spatial import KDTree
+from std_msgs.msg import Int32
 import numpy as np
 
 import math
@@ -36,9 +37,11 @@ class WaypointUpdater(object):
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
         # Only in simulator!!!!
-        rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.traffic_cb)
+        #rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.traffic_cb)
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
+        rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_light_detector_cb)
+
 
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
@@ -55,7 +58,8 @@ class WaypointUpdater(object):
         self.loop()
 
     def loop(self):
-        rate = rospy.Rate(50)
+        # 30 fps promises less lag for the waypoint generation
+        rate = rospy.Rate(30)
         while not rospy.is_shutdown():
             if self.pose and self.base_waypoints:
                 # Get closest waypoint
@@ -141,6 +145,25 @@ class WaypointUpdater(object):
         if not self.waypoints_2d:
             self.waypoints_2d =  [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y] for waypoint in waypoints.waypoints]
             self.waypoint_tree = KDTree(self.waypoints_2d)
+
+    def traffic_light_detector_cb(self, msg):
+        '''callback for traffic light messages from TL detector '''
+        tl_index = msg.data
+        if tl_index != -1:
+            # just set stoppline waypoint index
+            self.stopline_wp_idx = tl_index
+            cx = self.pose.pose.position.x
+            cy = self.pose.pose.position.y
+            # light x/y
+            lx,ly = self.waypoints_2d[tl_index]
+            # euclidean distance
+            dist = math.sqrt((cx-lx)**2 + (cy-ly)**2)
+
+            rospy.loginfo("Setting next stopline_wp_idx at " + str(tl_index) + " at dist " + str(dist))
+            self.stopline_dist = dist
+        elif tl_index == -1:
+            self.stopline_dist = 10000
+            self.stopline_wp_idx = None
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
