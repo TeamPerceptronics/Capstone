@@ -27,6 +27,7 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
 MAX_DECEL = 9.81 * 1.5 # max deceleration 1.5 g
 
+STOPLINE_OFFSET = 10    # make car stop before the stopline so that traffic light remains visible
 
 class WaypointUpdater(object):
 
@@ -151,7 +152,7 @@ class WaypointUpdater(object):
         tl_index = msg.data
         if tl_index != -1:
             # just set stoppline waypoint index
-            self.stopline_wp_idx = tl_index
+            self.stopline_wp_idx = tl_index - STOPLINE_OFFSET
             cx = self.pose.pose.position.x
             cy = self.pose.pose.position.y
             # light x/y
