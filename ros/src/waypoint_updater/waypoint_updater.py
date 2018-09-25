@@ -162,6 +162,7 @@ class WaypointUpdater(object):
             rospy.loginfo("Setting next stopline_wp_idx at " + str(tl_index) + " at dist " + str(dist))
             self.stopline_dist = dist
         elif tl_index == -1:
+            rospy.loginfo("Light not red, removing stopline")
             self.stopline_dist = 10000
             self.stopline_wp_idx = None
 
