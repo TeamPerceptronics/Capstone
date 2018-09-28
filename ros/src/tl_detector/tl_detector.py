@@ -53,6 +53,7 @@ class TLDetector(object):
         self.last_state = TrafficLight.UNKNOWN
         self.last_wp = -1
         self.state_count = 0
+        self.skip_next_detection = None
 
         self.STATE_MAP = {
             TrafficLight.UNKNOWN: 'unknown',
@@ -64,7 +65,9 @@ class TLDetector(object):
         self.f_cnt = 0
         rospy.loginfo("TL Detector Initialized!!!")
         rate = rospy.Rate(10)
+        self.start_time = None
         while not rospy.is_shutdown():
+            self.start_time = rospy.get_time()
             if self.camera_image:
                 light_wp, state = self.process_traffic_lights()
 
@@ -79,14 +82,24 @@ class TLDetector(object):
                     self.state_count = 0
                     self.state = state
                 elif self.state_count >= STATE_COUNT_THRESHOLD:
+                    if self.last_state == TrafficLight.RED and self.state == TrafficLight.GREEN:
+                        # If the traffic light just turned from RED to GREEN then skip the tl_detection for that light as it is not expected to turn RED immediately.
+                        # We will reset skip_next_detection once the car passed that traffic light.
+                        self.skip_next_detection = light_wp
+                        rospy.loginfo('Turned from RED to GREEN'+str(light_wp))
+                    
                     self.last_state = self.state
                     light_wp = light_wp if state == 0 else -1
-                    self.last_wp = light_wp
-                    self.upcoming_red_light_pub.publish(Int32(light_wp))
-                else:
+                    if self.last_wp!=-1 or light_wp!=-1:
+                        #Its not required to publish waypoint with -1 value continuously. If the last_wp and current wp is -1 then skip publish.
+                        self.last_wp = light_wp
+                        self.upcoming_red_light_pub.publish(Int32(light_wp))
+                elif self.last_wp!=-1:
                     self.upcoming_red_light_pub.publish(Int32(self.last_wp))
+                
                 self.state_count += 1
         
+            #rospy.loginfo('Time taken for the tl_detector loop is:'+ str(rospy.get_time()-self.start_time))
             rate.sleep()
 
     def pose_cb(self, msg):
@@ -202,13 +215,18 @@ class TLDetector(object):
                     closest_light = light
                     line_wp_idx = temp_wp_idx
 
-        rospy.loginfo('Closest light waypoint {0}'.format(line_wp_idx))
+        #rospy.loginfo('Closest light waypoint {0}'.format(line_wp_idx))
         state = TrafficLight.UNKNOWN
         if closest_light:
-            state = self.get_light_state(closest_light)
+            if self.skip_next_detection == line_wp_idx:
+                state = TrafficLight.GREEN
+            else:
+                rospy.loginfo('Calling get_light_state:'+str(line_wp_idx))
+                state = self.get_light_state(closest_light)
+                skip_next_detection = None
 
             #rospy.loginfo('Expected light state is {0}: {1}'.format(closest_light.state, self.STATE_MAP[closest_light.state]))
-            rospy.loginfo('raw state: ' + str(state))
+            #rospy.loginfo('raw state: ' + str(state))
             #return -1, TrafficLight.UNKNOWN #light_wp, state
 
         #NOTE: Sven removed this as message would result in always -1

@@ -55,17 +55,19 @@ class WaypointUpdater(object):
 
         self.stopline_wp_idx = None
         self.stopline_dist = 100000
-
+        self.start_time = None
         self.loop()
 
     def loop(self):
         # 30 fps promises less lag for the waypoint generation
         rate = rospy.Rate(30)
         while not rospy.is_shutdown():
+            self.start_time = rospy.get_time()
             if self.pose and self.base_waypoints:
                 # Get closest waypoint
                 #closest_waypoint_idx = self.get_closest_waypoint_idx()
                 self.publish_waypoints()
+            #rospy.loginfo('Time taken for the waypoint_updater loop is:'+ str(rospy.get_time()-self.start_time))
             rate.sleep()
 
     def get_closest_waypoint_idx(self):
