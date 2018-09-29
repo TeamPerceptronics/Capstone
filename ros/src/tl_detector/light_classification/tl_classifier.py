@@ -4,11 +4,15 @@ import tensorflow as tf
 import numpy as np
 
 class TLClassifier(object):
-    def __init__(self):
+    def __init__(self, is_site):
         #TODO load classifier
-
+        self.is_site = is_site
+        
         self.graph = tf.Graph()
-        FROZEN_GRAPH = 'models/frozen_inference_graph.pb'
+        if is_site:
+            FROZEN_GRAPH = 'models/frozen_inference_graph_site.pb'
+        else:
+            FROZEN_GRAPH = 'models/frozen_inference_graph_ssd_mobnet_v1_40k_sim.pb'
 
         with self.graph.as_default():
             graph_def = tf.GraphDef()

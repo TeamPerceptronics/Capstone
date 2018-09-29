@@ -46,7 +46,7 @@ class TLDetector(object):
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
         self.bridge = CvBridge()
-        self.light_classifier = TLClassifier()
+        self.light_classifier = TLClassifier(self.config['is_site'])
         self.listener = tf.TransformListener()
 
         self.state = TrafficLight.UNKNOWN
@@ -222,7 +222,10 @@ class TLDetector(object):
                 state = TrafficLight.GREEN
             else:
                 rospy.loginfo('Calling get_light_state:'+str(line_wp_idx))
+                start_time = rospy.get_time()
                 state = self.get_light_state(closest_light)
+                end_time = rospy.get_time()
+                rospy.loginfo('Time taken by get_light_state: '+str(end_time - start_time) + 's')
                 skip_next_detection = None
 
             #rospy.loginfo('Expected light state is {0}: {1}'.format(closest_light.state, self.STATE_MAP[closest_light.state]))

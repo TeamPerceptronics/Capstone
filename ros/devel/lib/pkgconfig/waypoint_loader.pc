@@ -1,8 +1,8 @@
-prefix=/capstone/ros/devel
+prefix=/home/md/Projects/Udacity/Capstone/ros/devel
 
 Name: waypoint_loader
 Description: Description of waypoint_loader
 Version: 0.0.0
 Cflags: 
-Libs: -L/capstone/ros/devel/lib 
+Libs: -L/home/md/Projects/Udacity/Capstone/ros/devel/lib 
 Requires: 
